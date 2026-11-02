@@ -1,0 +1,26 @@
+# Works with Rancher Desktop (dockerd engine: `docker compose`, containerd engine: `nerdctl compose`).
+services:
+  ops-server:
+    build: .
+    command: ["ops-server", "--http", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "8000:8000"   # also lets MCP Inspector on your Mac connect to http://localhost:8000/mcp
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('localhost', 8000), 2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  agent:
+    build: .
+    command: ["agent"]
+    environment:
+      MCP_SERVER_URL: http://ops-server:8000/mcp
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      LAB_LOG_DIR: /app/logs
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      ops-server:
+        condition: service_healthy
+    profiles: ["agent"]   # started on demand with `docker compose run --rm agent`
